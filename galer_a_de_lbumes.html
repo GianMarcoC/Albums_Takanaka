@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galería de Álbumes Interactiva</title>
+    <style>
+        :root {
+            --bg-color: #4a2c2a;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #111;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        /* Contenedor principal adaptable */
+        .room-container {
+            position: relative;
+            width: 100%;
+            max-width: 1200px;
+            height: 100vh;
+            max-height: 800px;
+            background-color: var(--bg-color);
+            background-size: cover;
+            background-image: url('Imagenes/background_room.png');
+            background-position: center;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border-radius: 12px;
+        }
+
+        /* Contenedor para los álbumes en la pared (Alineados a la derecha) */
+        .albums-wall {
+            position: absolute;
+            top: 20%;
+            right: 10%;
+            width: 350px;
+            height: 300px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .album-item {
+            width: 100px;
+            height: 100px;
+            margin: 10px;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            /* Variables CSS actualizadas por JS */
+            --target-x: 0;
+            --target-y: 0;
+            --target-scale: 1;
+        }
+
+        .album-item:hover {
+            transform: scale(1.1);
+            box-shadow: 4px 4px 15px rgba(0,0,0,0.5);
+        }
+
+        .album-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+        }
+
+        /* Estado activo (álbum centrado) */
+        .album-item.active {
+            position: relative;
+            z-index: 100;
+            transition: all 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+            transform: translate(var(--target-x), var(--target-y)) scale(var(--target-scale)) !important;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            cursor: default;
+        }
+
+        /* Panel de información (Efecto Cristal) */
+        .info-panel {
+            position: absolute;
+            top: 50%;
+            left: 5%;
+            transform: translateY(-50%);
+            width: 350px;
+            max-height: 80%;
+            padding: 30px;
+            background: rgba(30, 30, 30, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+            z-index: 90;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease 0.2s;
+            overflow-y: auto;
+            box-sizing: border-box;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+        }
+
+        /* Scrollbar personalizado */
+        .info-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+        .info-panel::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        .info-panel.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Botón de cerrar */
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 30px;
+            height: 30px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 50%;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+
+        .close-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.1);
+        }
+
+        /* Tipografía del panel */
+        .album-title {
+            margin: 0 0 5px 0;
+            font-size: 1.6rem;
+            font-weight: 600;
+        }
+
+        .album-artist {
+            margin: 0 0 15px 0;
+            font-size: 1rem;
+            color: #b0c4de;
+            font-style: italic;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 10px;
+        }
+
+        .album-description {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            color: #e0e0e0;
+        }
+
+        .tracklist-title {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .tracklist {
+            list-style: decimal inside;
+            padding: 0;
+            margin: 0;
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+
+        .tracklist li {
+            margin-bottom: 6px;
+            padding: 4px 0;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+        }
+
+        /* Capa de oscurecimiento general */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 50;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        .overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Medias queries para pantallas más pequeñas */
+        @media (max-width: 768px) {
+            .info-panel {
+                width: 90%;
+                left: 5%;
+                top: 60%;
+                max-height: 40%;
+            }
+            .albums-wall {
+                top: 10%;
+                right: auto;
+                left: 50%;
+                transform: translateX(-50%);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="room-container" id="room">
+        <!-- Capa de superposición -->
+        <div class="overlay" id="overlay"></div>
+
+        <!-- Panel de Información -->
+        <div class="info-panel" id="infoPanel">
+            <button class="close-btn" id="closeBtn">×</button>
+            <h2 class="album-title" id="panelTitle">Título</h2>
+            <h3 class="album-artist" id="panelArtist">Artista</h3>
+            <p class="album-description" id="panelDesc">Descripción</p>
+            <h4 class="tracklist-title">Canciones</h4>
+            <ul class="tracklist" id="panelTracklist"></ul>
+        </div>
+
+        <!-- Pared de Álbumes -->
+        <div class="albums-wall" id="albumsContainer"></div>
+    </div>
+
+    <script>
+        // Datos de los álbumes usando placehold.co para las imágenes temporales
+        const albumData = [
+            {
+                id: 'album1',
+                imageSrc: 'Imagenes/All_Of_Me_Album_1.png',
+                title: 'All of Me',
+                artist: 'Masayoshi Takanaka',
+                description: 'Un álbum clásico de jazz fusión y city pop, lleno de energía vibrante y virtuosismo en la guitarra, transportándote a paisajes sonoros tropicales.',
+                tracklist: [
+                    'Oh! Tengo Suerte',
+                    'Tokyo Reggie',
+                    'Shinkiro',
+                    'Jumping Take Off',
+                    'Mambo No. 5 (Disco Dango)'
+                ]
+            },
+            {
+                id: 'album2',
+                imageSrc: 'Imagenes/Takanaka_Album_2.png',
+                title: 'Seychelles',
+                artist: 'Masayoshi Takanaka',
+                description: 'Debut icónico como solista. Sus melodías de guitarra capturan la esencia del verano y las playas exóticas, sentando las bases del sonido City Pop instrumental.',
+                tracklist: [
+                    'Oh! Tengo Suerte (Versión Original)',
+                    'Tokyo Reggie',
+                    'Tropic Birds',
+                    'Rainbow Paradise'
+                ]
+            },
+            {
+                id: 'album3',
+                imageSrc: 'Imagenes/Brazilian_Skies_Album_3.png',
+                title: 'Brazilian Skies',
+                artist: 'Masayoshi Takanaka',
+                description: 'Una fusión magistral de ritmos brasileños y jazz contemporáneo. Takanaka incorpora influencias de la samba y la bossa nova con su estilo característico.',
+                tracklist: [
+                    'Beleza Pula',
+                    'Brasilian Skies',
+                    'Nights',
+                    'I Remember Clifford',
+                    'Star Wars Samba'
+                ]
+            }
+        ];
+        
+        const container = document.getElementById('albumsContainer');
+        const room = document.getElementById('room');
+        const infoPanel = document.getElementById('infoPanel');
+        const overlay = document.getElementById('overlay');
+        const closeBtn = document.getElementById('closeBtn');
+
+        const pTitle = document.getElementById('panelTitle');
+        const pArtist = document.getElementById('panelArtist');
+        const pDesc = document.getElementById('panelDesc');
+        const pTracks = document.getElementById('panelTracklist');
+
+        let activeAlbumElement = null;
+        let isAnimating = false;
+
+        // Renderizar álbumes
+        albumData.forEach((album, index) => {
+            const div = document.createElement('div');
+            div.className = 'album-item';
+            div.dataset.id = album.id;
+            
+            // Posicionamiento en forma de triángulo
+            if(index === 0) { div.style.marginTop = '80px'; }
+            if(index === 1) { div.style.marginTop = '-50px'; }
+            if(index === 2) { div.style.marginTop = '80px'; }
+
+            const img = document.createElement('img');
+            img.src = album.imageSrc;
+            img.referrerPolicy = 'no-referrer';
+
+            div.appendChild(img);
+            container.appendChild(div);
+
+            // Evento Click
+            div.addEventListener('click', () => openAlbum(div, album));
+        });
+
+        // Función para abrir el álbum
+        function openAlbum(element, data) {
+            if (activeAlbumElement || isAnimating) return;
+            isAnimating = true;
+            activeAlbumElement = element;
+
+            element.style.pointerEvents = 'none';
+
+            // Actualizar textos
+            pTitle.textContent = data.title;
+            pArtist.textContent = data.artist;
+            pDesc.textContent = data.description;
+            
+            // Limpiar y llenar tracklist
+            pTracks.innerHTML = '';
+            data.tracklist.forEach(track => {
+                const li = document.createElement('li');
+                li.textContent = track;
+                pTracks.appendChild(li);
+            });
+            
+            // Cálculos para centrar el álbum en el espacio disponible
+            const rect = element.getBoundingClientRect();
+            const roomRect = room.getBoundingClientRect();
+
+            // Tamaño objetivo adaptativo
+            const targetSize = Math.min(280, roomRect.width * 0.4); 
+            const scale = targetSize / rect.width;
+
+            // Determinar el centro del área visible (mitad derecha o centro superior en móviles)
+            let targetCenterX, targetCenterY;
+
+            if (window.innerWidth > 768) {
+                // Layout Escritorio: Centrar en el espacio derecho
+                const panelWidth = 350 + (roomRect.width * 0.05);
+                const availableWidth = roomRect.width - panelWidth;
+                targetCenterX = panelWidth + (availableWidth / 2);
+                targetCenterY = roomRect.height / 2;
+            } else {
+                // Layout Móvil: Centrar arriba del panel
+                targetCenterX = roomRect.width / 2;
+                targetCenterY = roomRect.height * 0.25;
+            }
+
+            const currentCenterX = rect.left - roomRect.left + (rect.width / 2);
+            const currentCenterY = rect.top - roomRect.top + (rect.height / 2);
+
+            const moveX = targetCenterX - currentCenterX;
+            const moveY = targetCenterY - currentCenterY;
+
+            // Aplicar variables CSS
+            element.style.setProperty('--target-x', `${moveX}px`);
+            element.style.setProperty('--target-y', `${moveY}px`);
+            element.style.setProperty('--target-scale', scale);
+
+            // Iniciar animación
+            element.classList.add('active');
+            overlay.classList.add('visible');
+            infoPanel.classList.add('visible');
+
+            setTimeout(() => { isAnimating = false; }, 600);
+        }
+
+        // Función para cerrar el álbum
+        function closeAlbum() {
+            if (!activeAlbumElement || isAnimating) return;
+            isAnimating = true;
+
+            activeAlbumElement.classList.remove('active');
+            overlay.classList.remove('visible');
+            infoPanel.classList.remove('visible');
+
+            const el = activeAlbumElement;
+            setTimeout(() => {
+                el.style.pointerEvents = 'auto';
+                activeAlbumElement = null;
+                isAnimating = false;
+            }, 600);
+        }
+
+        // Eventos para cerrar
+        closeBtn.addEventListener('click', closeAlbum);
+        overlay.addEventListener('click', closeAlbum);
+
+        // Recalcular posiciones en resize (evita bugs si cambian el tamaño de la ventana con un álbum abierto)
+        window.addEventListener('resize', () => {
+            if (activeAlbumElement && !isAnimating) {
+                closeAlbum();
+            }
+        });
+
+    </script>
+</body>
+</html>
